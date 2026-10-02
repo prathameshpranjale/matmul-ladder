@@ -1,0 +1,641 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Matmul Ladder</title>
+<style>
+:root {
+  --bg: #f6f7f9; --surface: #ffffff; --surface2: #eef1f5; --text: #15202b; --muted: #55657a;
+  --line: #d5dce6; --accent: #0b6bcb; --accent-soft: #d8e9fb; --good: #12805c; --bad: #c2362b;
+  --warn: #a15c00; --c0: #0b6bcb; --c1: #12805c; --c2: #a15c00; --c3: #8a3ffc; --c4: #c2362b;
+  --shadow: 0 1px 2px rgba(20,30,50,.08), 0 6px 20px rgba(20,30,50,.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e141b; --surface: #17202b; --surface2: #1e2a38; --text: #e8eef6; --muted: #9db0c6;
+    --line: #2b394a; --accent: #5aa9f5; --accent-soft: #17324d; --good: #4cc79a; --bad: #ff7f73;
+    --warn: #f0b04c; --c0: #5aa9f5; --c1: #4cc79a; --c2: #f0b04c; --c3: #b794ff; --c4: #ff7f73;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 6px 20px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e141b; --surface: #17202b; --surface2: #1e2a38; --text: #e8eef6; --muted: #9db0c6;
+  --line: #2b394a; --accent: #5aa9f5; --accent-soft: #17324d; --good: #4cc79a; --bad: #ff7f73;
+  --warn: #f0b04c; --c0: #5aa9f5; --c1: #4cc79a; --c2: #f0b04c; --c3: #b794ff; --c4: #ff7f73;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 6px 20px rgba(0,0,0,.3);
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+a { color: var(--accent); }
+.wrap { max-width: 1020px; margin: 0 auto; padding: 0 16px; }
+header.top { position: sticky; top: 0; z-index: 10; background: var(--surface); border-bottom: 1px solid var(--line); }
+header.top .wrap { display: flex; align-items: center; gap: 14px; height: 52px; }
+header.top strong { white-space: nowrap; }
+nav { display: flex; gap: 4px; overflow-x: auto; flex: 1; scrollbar-width: none; }
+nav a { text-decoration: none; color: var(--muted); font-size: 14px; padding: 6px 10px; border-radius: 8px; white-space: nowrap; }
+nav a:hover { background: var(--surface2); color: var(--text); }
+button, select { font: inherit; color: var(--text); background: var(--surface2); border: 1px solid var(--line);
+  border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+section { padding: 56px 0 8px; }
+h1 { font-size: clamp(32px, 6vw, 56px); line-height: 1.1; margin: 0 0 14px; letter-spacing: -.02em; }
+h2 { font-size: clamp(24px, 4vw, 34px); margin: 0 0 6px; letter-spacing: -.01em; }
+h3 { font-size: 18px; margin: 0 0 6px; }
+.lead { font-size: 19px; color: var(--muted); max-width: 720px; }
+.kicker { color: var(--accent); font-weight: 600; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; box-shadow: var(--shadow); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+@media (max-width: 760px) { .grid2, .grid3, .grid4 { grid-template-columns: 1fr; } }
+.stat { text-align: left; }
+.stat .num { font-size: 34px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
+.stat .lbl { color: var(--muted); font-size: 14px; }
+.muted { color: var(--muted); }
+.note { font-size: 14px; color: var(--muted); border-left: 3px solid var(--line); padding-left: 12px; margin: 12px 0; }
+.tag { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent); }
+.tag.hyp { background: transparent; border: 1px dashed var(--warn); color: var(--warn); }
+.tag.meas { background: transparent; border: 1px solid var(--good); color: var(--good); }
+.tag.illu { background: transparent; border: 1px dashed var(--muted); color: var(--muted); }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0; }
+.controls label { color: var(--muted); font-size: 14px; }
+code, pre { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 14px; }
+pre { background: var(--surface2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; overflow-x: auto; margin: 10px 0; }
+code { background: var(--surface2); padding: 1px 6px; border-radius: 6px; }
+pre code { background: none; padding: 0; }
+
+/* memory-walk illustration */
+.mem { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; max-width: 360px; margin: 10px 0; }
+.cell { aspect-ratio: 1; border-radius: 4px; background: var(--surface2); border: 2px solid transparent;
+  font-size: 10px; display: flex; align-items: center; justify-content: center; color: var(--muted); transition: background .15s; }
+.cell.seen { background: var(--accent-soft); }
+.cell.cached { border-color: var(--good); }
+.cell.now { background: var(--accent); color: #fff; }
+.cell.miss { background: var(--bad); color: #fff; }
+.cell.line0 { border-left-color: var(--line); }
+.cachebox { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; min-height: 34px; }
+.cline { border: 2px solid var(--good); border-radius: 6px; padding: 2px 8px; font-size: 12px; font-family: ui-monospace, Consolas, monospace; }
+.meter { height: 10px; border-radius: 6px; background: var(--surface2); overflow: hidden; }
+.meter > i { display: block; height: 100%; background: var(--bad); transition: width .2s; }
+
+/* tiling */
+.tilegrid { position: relative; width: 100%; max-width: 360px; aspect-ratio: 1; background:
+  repeating-linear-gradient(0deg, transparent 0 calc(12.5% - 1px), var(--line) calc(12.5% - 1px) 12.5%),
+  repeating-linear-gradient(90deg, transparent 0 calc(12.5% - 1px), var(--line) calc(12.5% - 1px) 12.5%), var(--surface2);
+  border-radius: 8px; border: 1px solid var(--line); overflow: hidden; }
+.tile { position: absolute; background: color-mix(in srgb, var(--accent) 60%, transparent); border: 2px solid var(--accent); transition: all .35s; }
+.sizebar { position: relative; height: 34px; background: var(--surface2); border-radius: 8px; margin: 26px 0 28px; }
+.sizebar .fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent-soft); border-right: 3px solid var(--accent); border-radius: 8px 0 0 8px; transition: width .3s; }
+.sizebar .mark { position: absolute; top: -20px; bottom: -8px; border-left: 2px dashed var(--muted); font-size: 11px; color: var(--muted); padding-left: 4px; white-space: nowrap; }
+
+/* simd */
+.lanes { display: flex; gap: 4px; margin: 6px 0 12px; }
+.lane { width: 100%; height: 30px; border-radius: 6px; background: var(--surface2); border: 1px solid var(--line); transition: background .15s; }
+.lane.on { background: var(--c1); border-color: var(--c1); }
+
+/* threads */
+.tgrid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; max-width: 360px; }
+.tt { aspect-ratio: 1; border-radius: 4px; font-size: 10px; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 600; }
+
+/* charts */
+svg text { fill: var(--text); font-family: inherit; }
+svg .muted { fill: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px; color: var(--muted); }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.chal { border-left: 4px solid var(--accent); }
+.chal.driver { border-left-color: var(--c3); }
+.chal h3 { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.chal dl { margin: 8px 0 0; display: grid; grid-template-columns: 92px 1fr; gap: 4px 10px; font-size: 14px; }
+.chal dt { color: var(--muted); font-weight: 600; }
+.chal dd { margin: 0; }
+footer { padding: 48px 0 64px; color: var(--muted); font-size: 14px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <strong>Matmul Ladder</strong>
+  <nav aria-label="Sections">
+    <a href="#problem">Problem</a><a href="#memory">Memory</a><a href="#tiling">Tiling</a>
+    <a href="#simd">SIMD</a><a href="#threads">Threads</a><a href="#ladder">Results</a>
+    <a href="#trust">Trust</a><a href="#challenges">Challenges</a><a href="#limits">Limits</a>
+  </nav>
+  <button id="theme" type="button" aria-label="Toggle light or dark theme">Theme</button>
+</div></header>
+
+<main class="wrap">
+
+<section id="top" style="padding-top:44px">
+  <div class="kicker">Same math, 135x faster</div>
+  <h1>How a laptop CPU goes from 0.6 to 83 GFLOPS</h1>
+  <p class="lead">One problem (multiply two matrices), five steps. Each step changes one thing, and each is measured. This page shows what happens inside the machine, and what we measured.</p>
+  <div class="grid4" style="margin-top:22px">
+    <div class="card stat"><div class="num">0.61</div><div class="lbl">GFLOPS, naive loop</div></div>
+    <div class="card stat"><div class="num">27.9</div><div class="lbl">GFLOPS, SIMD on one core</div></div>
+    <div class="card stat"><div class="num">82.8</div><div class="lbl">GFLOPS, 12 threads</div></div>
+    <div class="card stat"><div class="num">~135x</div><div class="lbl">naive to step 5, n = 1024</div></div>
+  </div>
+  <p class="note">Machine: Intel Core i5-1235U, WSL2, gcc 13.3. Labels used on this page:
+    <span class="tag meas">measured</span> a number from our runs,
+    <span class="tag illu">illustration</span> a simplified animation to build intuition, not a measurement,
+    <span class="tag hyp">hypothesis</span> an explanation that fits the data but that we could not verify (no hardware counters here).</p>
+</section>
+
+<section id="problem">
+  <div class="kicker">The problem</div>
+  <h2>Multiply two n x n matrices</h2>
+  <p class="lead">Each output number is a row of A times a column of B, added up. That is 2 x n&sup3; arithmetic operations. For n = 1024 that is about 2 billion.</p>
+  <div class="card">
+    <pre><code>for i in 0..n:  for j in 0..n:  for k in 0..n:
+    C[i][j] += A[i][k] * B[k][j]</code></pre>
+    <p class="muted" style="margin:6px 0 0">Speed is measured in <b>GFLOPS</b>: billions of operations per second. Higher is better. The CPU is not the slow part of this loop; <b>how it walks through memory is</b>.</p>
+  </div>
+</section>
+
+<section id="memory">
+  <div class="kicker">Steps 1 and 2</div>
+  <h2>Memory is stored in rows</h2>
+  <p class="lead">A matrix lives in memory row after row. When the CPU reads one number, it actually fetches a whole <b>cache line</b> (16 floats on real hardware; 4 in this illustration) into a small fast cache. Next to it is free, if you use it.</p>
+  <div class="card">
+    <span class="tag illu">illustration</span>
+    <div class="controls">
+      <button id="mPlay" class="primary" type="button">Play</button>
+      <button id="mStep" type="button">Step</button>
+      <button id="mReset" type="button">Reset</button>
+      <label for="mCache">Cache holds</label>
+      <select id="mCache"><option value="4">4 lines</option><option value="8" selected>8 lines</option><option value="16">16 lines</option></select>
+      <span class="muted" id="mHint"></span>
+    </div>
+    <div class="grid2">
+      <div>
+        <h3>Naive: walk down a column of B</h3>
+        <div class="mem" id="memA" aria-label="Naive access pattern"></div>
+        <div class="cachebox" id="cacheA"></div>
+        <div class="meter"><i id="barA" style="width:0"></i></div>
+        <p class="muted" id="statA" style="margin:6px 0 0"></p>
+      </div>
+      <div>
+        <h3>Reordered: walk along a row of B</h3>
+        <div class="mem" id="memB" aria-label="Reordered access pattern"></div>
+        <div class="cachebox" id="cacheB"></div>
+        <div class="meter"><i id="barB" style="width:0"></i></div>
+        <p class="muted" id="statB" style="margin:6px 0 0"></p>
+      </div>
+    </div>
+    <p class="note">Red = the number was not in the cache (a miss: slow trip to main memory). Blue = hit. Green outline = a cache line currently held. Try 4 lines: the column walk misses every time. Try 8 or 16: the second column finds its lines still cached. That is why the naive loop is fine for small matrices and falls apart for large ones.</p>
+  </div>
+  <div class="grid2" style="margin-top:16px">
+    <div class="card"><span class="tag meas">measured</span><h3>Naive loop slows down as n grows</h3>
+      <svg id="svgNaive" viewBox="0 0 420 200" width="100%" role="img" aria-label="Naive GFLOPS by matrix size"></svg>
+      <p class="muted" style="margin:0;font-size:14px">The reordered loop stays near 3.5 GFLOPS. Same arithmetic, different order. Final run.</p></div>
+    <div class="card"><h3>What changed in the code</h3>
+<pre><code>// step 1: B walks down a column
+for i: for j: for k:
+  sum += A[i][k] * B[k][j]
+
+// step 2: B and C walk along rows
+for i: for k: a = A[i][k]
+  for j: C[i][j] += a * B[k][j]</code></pre>
+      <p class="muted" style="margin:0">Result: about <b>5.8x</b> faster at n = 1024. <span class="tag hyp">hypothesis</span> The reason is cache use; we have no cache-miss counters to confirm it.</p></div>
+  </div>
+</section>
+
+<section id="tiling">
+  <div class="kicker">Step 3</div>
+  <h2>Work on small tiles that stay in cache</h2>
+  <p class="lead">Instead of streaming through a whole row of B every time, cut the matrices into tiles and finish all the work on one tile before moving on, so its data is reused while it is still cached.</p>
+  <div class="card">
+    <div class="grid2">
+      <div>
+        <span class="tag illu">illustration</span>
+        <div class="controls"><label for="tSize">Tile edge (BLOCK)</label>
+          <select id="tSize"><option>16</option><option>32</option><option>64</option><option>128</option><option selected>256</option></select></div>
+        <div class="tilegrid" id="tileGrid" aria-label="A tile moving across matrix B"><div class="tile" id="tileBox"></div></div>
+        <p class="muted" style="font-size:14px" id="tText"></p>
+      </div>
+      <div>
+        <h3>Does the tile fit in the cache?</h3>
+        <div class="sizebar" id="sizeBar"><div class="fill" id="sizeFill"></div></div>
+        <p class="muted" style="font-size:14px;margin:0">One B tile is BLOCK x BLOCK floats. Cache sizes are approximate: L1 about 48 KB, L2 about 1.25 MB per performance core <span class="tag hyp">estimate</span></p>
+        <h3 style="margin-top:16px">Measured: tile size vs speed (n = 1024)</h3>
+        <svg id="svgTile" viewBox="0 0 420 210" width="100%" role="img" aria-label="GFLOPS by tile size"></svg>
+      </div>
+    </div>
+    <p class="note">Small tiles (16 to 96) were <b>slower</b> than not tiling at all (plain reorder is about 2.7 in a comparable session); big tiles won. Median of 3 rounds, rotating through sizes. Overall gain from tiling: about 15% at n = 1024, confirmed by alternating runs. <span class="tag hyp">hypothesis</span> Short inner loops add overhead.</p>
+  </div>
+</section>
+
+<section id="simd">
+  <div class="kicker">Step 4</div>
+  <h2>Do 8 floats at once</h2>
+  <p class="lead">The CPU has 256-bit vector registers: 8 floats side by side, and one instruction (fused multiply-add) updates all 8.</p>
+  <div class="card">
+    <span class="tag illu">illustration</span>
+    <div class="controls"><button id="sPlay" class="primary" type="button">Play</button><button id="sReset" type="button">Reset</button>
+      <span class="muted" id="sHint"></span></div>
+    <h3>Scalar: one float per instruction</h3>
+    <div class="lanes" id="lanesS"></div>
+    <p class="muted" id="sCountS" style="margin:0 0 14px"></p>
+    <h3>SIMD (AVX2): eight floats per instruction</h3>
+    <div class="lanes" id="lanesV"></div>
+    <p class="muted" id="sCountV" style="margin:0"></p>
+    <pre><code>c[j..j+7] = fma(broadcast(a), b[j..j+7], c[j..j+7])   // one instruction, 8 lanes</code></pre>
+  </div>
+  <div class="grid2" style="margin-top:16px">
+    <div class="card"><span class="tag meas">measured</span><h3>Step 3 vs step 4 (n = 1024)</h3>
+      <div class="stat"><div class="num">4.1 &rarr; 27.4</div><div class="lbl">GFLOPS, median of 6 alternating rounds. Ranges: 3.9 to 4.5 vs 25.7 to 28.6, nowhere near each other. About 6.7x.</div></div></div>
+    <div class="card"><h3>What it tells us</h3>
+      <p class="muted" style="margin:0">Most of the earlier slowness was <b>instruction count</b>, not memory. We are still far from the CPU's limit: every vector multiply-add still does two loads and a store. <span class="tag hyp">hypothesis</span> Keeping a small block of C in registers (register tiling) is the usual next step. We did not build it.</p></div>
+  </div>
+</section>
+
+<section id="threads">
+  <div class="kicker">Step 5</div>
+  <h2>Split the output across threads</h2>
+  <p class="lead">Cut C into 128 x 128 output tiles. Each tile belongs to <b>one</b> thread, so no two threads ever write the same number: no locks, no races.</p>
+  <div class="card">
+    <div class="grid2">
+      <div>
+        <span class="tag illu">illustration</span>
+        <div class="controls"><label for="thN">Threads</label>
+          <input id="thN" type="range" min="1" max="12" value="12"><b id="thVal">12</b></div>
+        <div class="tgrid" id="tGrid" aria-label="Output tiles colored by thread"></div>
+        <p class="muted" style="font-size:14px" id="thText"></p>
+      </div>
+      <div>
+        <h3>Measured: threads vs speed</h3>
+        <div class="controls"><label for="thSize">Matrix size</label>
+          <select id="thSize"><option value="1024">n = 1024</option><option value="2048">n = 2048</option></select></div>
+        <svg id="svgThreads" viewBox="0 0 420 250" width="100%" role="img" aria-label="GFLOPS by thread count"></svg>
+      </div>
+    </div>
+    <p class="note"><span class="tag meas">measured</span> 12 threads are about 3.0x (n = 1024) and 3.4x (n = 2048) faster than one SIMD thread, far from 12x. At n = 1024, 4 threads were no faster than 2. <span class="tag hyp">hypothesis</span> This CPU has 2 fast performance cores (4 hardware threads) and 8 slower efficiency cores, and a core's two threads share its vector units. Tiny matrices were useless for threads: start-up cost dominated (noise up to 3387% at n = 100).</p>
+  </div>
+</section>
+
+<section id="ladder">
+  <div class="kicker">Everything together</div>
+  <h2>The whole ladder</h2>
+  <div class="card">
+    <span class="tag meas">measured</span>
+    <div class="controls"><label for="scale">Scale</label>
+      <select id="scale"><option value="log" selected>Logarithmic (all bars visible)</option><option value="lin">Linear (honest ratios)</option></select>
+      <label for="lsize">Matrix size</label>
+      <select id="lsize"><option value="1024" selected>n = 1024</option><option value="512">n = 512</option><option value="2048">n = 2048 (steps 2 to 5)</option></select></div>
+    <svg id="svgLadder" viewBox="0 0 700 300" width="100%" role="img" aria-label="GFLOPS for each step"></svg>
+    <div id="ladderTable" style="overflow-x:auto"></div>
+    <p class="note">Final run, single pass per size; the noise column is the spread across runs. Close comparisons (tiling, SIMD) were confirmed by alternating rounds. Quote the ratios: this laptop's speed drifts 30 to 40% between sessions (naive n = 1024 measured 0.40 and later 0.61). All versions match the reference answer. Step 5 at n = 512 is noisy (47%) and is not a reliable figure.</p>
+  </div>
+</section>
+
+<section id="trust">
+  <div class="kicker">Why you can believe the numbers</div>
+  <h2>How we checked ourselves</h2>
+  <div class="grid2">
+    <div class="card"><h3>Correct before fast</h3><p class="muted" style="margin:0">Every version is compared with a double-precision reference first. The output buffer starts filled with NaN, so a version that skips work cannot pass. Nothing is timed until the answer is right.</p></div>
+    <div class="card"><h3>Break it on purpose</h3><p class="muted" style="margin:0">We skipped the last column in a copy: the harness reported <code>WRONG RESULT</code> (error 0.63) and timed nothing. A check that cannot fail proves nothing.</p></div>
+    <div class="card"><h3>Alternate, do not sequence</h3><p class="muted" style="margin:0">Our first tile sweep ran each size once, in order, and said blocking was <i>slower</i>. The machine's speed was drifting. Alternating rounds and comparing ranges gave the opposite, correct answer.</p></div>
+    <div class="card"><h3>Show the noise</h3><p class="muted" style="margin:0">Every result prints how much the runs differed. Where that was huge (tiny matrices with threads), we did not quote the number.</p></div>
+  </div>
+</section>
+
+<section id="challenges">
+  <div class="kicker">Problems and fixes</div>
+  <h2>What went wrong, and how we fixed it</h2>
+  <div class="controls"><label for="cFilter">Show</label>
+    <select id="cFilter"><option value="all">All</option><option value="matmul">Matmul ladder</option><option value="driver">PCI driver project</option></select></div>
+  <div id="chalList" class="grid2"></div>
+</section>
+
+<section id="limits">
+  <div class="kicker">Honest limits</div>
+  <h2>What this does not show</h2>
+  <div class="card">
+    <ul style="margin:0;padding-left:20px">
+      <li><b>No GPU steps.</b> This machine has no NVIDIA GPU (Windows lists only Intel graphics). CUDA steps need another machine or a cloud GPU.</li>
+      <li><b>No comparison with OpenBLAS or cuBLAS</b> (not installed), so we cannot say how close we are to a tuned library.</li>
+      <li><b>No hardware counters</b> (<code>perf</code> does not work here). Every "why" on this page marked <span class="tag hyp">hypothesis</span> fits the data but is unverified.</li>
+      <li><b>One machine, one run family.</b> Absolute numbers will differ on yours; the ratios are what to compare.</li>
+      <li><b>Next step on the CPU:</b> register tiling. Not built.</li>
+    </ul>
+  </div>
+  <h3 style="margin-top:24px">Reproduce it</h3>
+<pre><code>scripts/check_env.sh      # what is installed
+scripts/run_bench.sh      # build and run all versions
+scripts/final_run.sh      # the full measurement used here</code></pre>
+</section>
+
+</main>
+<footer><div class="wrap">Matmul Ladder presentation. Data: <code>bench/history/20261002-174143-final.txt</code>, <code>RESULTS_LOG.md</code>, <code>CHALLENGES_AND_FIXES.md</code>. Technique credits are listed in the project README.</div></footer>
+
+<script>
+"use strict";
+/* ---------- DATA (copied from the final run and the logs; see RESULTS_LOG.md) ---------- */
+const STEPS = [
+  { id: 1, name: "Naive loop",     short: "naive" },
+  { id: 2, name: "Reorder loops",  short: "reorder" },
+  { id: 3, name: "Cache blocking", short: "blocked" },
+  { id: 4, name: "SIMD (AVX2)",    short: "simd" },
+  { id: 5, name: "12 threads",     short: "threads" }
+];
+/* GFLOPS and noise (%) per step, final run, single pass per size. null = not run / not meaningful. */
+const LADDER = {
+  512:  { g: [2.211, 3.420, 4.216, 27.923, 69.548], noise: [10, 25, 18, 44, 47] },
+  1024: { g: [0.613, 3.535, 4.310, 27.936, 82.808], noise: [13, 9, 3, 3, 26] },
+  2048: { g: [null,  3.145, 4.080, 21.337, 80.690], noise: [null, 4, 7, 10, 7] }
+};
+const NAIVE_BY_N = [[256, 2.719], [512, 2.211], [1024, 0.613]];
+const REORDER_BY_N = [[256, 3.406], [512, 3.420], [1024, 3.535]];
+const TILE = [[16, 2.272], [32, 2.501], [64, 2.350], [96, 2.593], [128, 3.089], [256, 3.217]];
+const THREADS = {
+  1024: { simd1: 26.997, t: [[1, 23.897], [2, 48.877], [4, 47.609], [6, 59.550], [8, 70.759], [12, 81.684]] },
+  2048: { simd1: 26.571, t: [[1, 22.871], [2, 39.914], [4, 55.284], [6, 69.730], [8, 77.956], [12, 90.319]] }
+};
+const CHALLENGES = [
+  { p: "matmul", t: "Timings contradicted themselves", s: "Same code: 3.25 then 0.95 GFLOPS at n = 512.", c: "A laptop under WSL2: clock changes, other processes, cores moving.", f: "More runs, pin one core, print a noise column, run twice before believing a number." },
+  { p: "matmul", t: "The first tile sweep gave the wrong answer", s: "It said blocking was slower, then a full run said faster.", c: "Each size was run once, in sequence, while the machine's speed drifted 25 to 40%.", f: "Alternate versions across rounds; compare medians and ranges; call it real only if ranges do not overlap." },
+  { p: "matmul", t: "Absolute numbers change between sessions", s: "Naive n = 1024: 0.40, later 0.61.", c: "Same drift, bigger scale.", f: "Report ranges and same-session ratios." },
+  { p: "matmul", t: "No NVIDIA GPU on this machine", s: "nvidia-smi not found anywhere.", c: "Windows lists only Intel graphics.", f: "CPU steps now; CUDA steps need another machine or a cloud GPU. Plan corrected." },
+  { p: "matmul", t: "My build check hid a compile error", s: "'BUILD_OK' printed, but the old binary ran.", c: "I piped make into head, so the exit status was head's.", f: "pipefail, delete the old binary first, read the real error." },
+  { p: "matmul", t: "Pinning one core would cripple threads", s: "Scripts used taskset on the whole benchmark.", c: "That would pin all threads of step 5 to one core.", f: "The harness pins only single-thread versions; scripts no longer use taskset." },
+  { p: "matmul", t: "Step 5 on 1 thread was slower than step 4", s: "19.8 vs 25.7 GFLOPS, same kernel.", c: "Hypothesis: smaller output tiles, shorter inner loops.", f: "Swept the thread-tile size; 128 chosen as the best balance." },
+  { p: "matmul", t: "Threads did not scale evenly", s: "2 threads 48.9, 4 threads 47.6 GFLOPS.", c: "Hypothesis: 2 fast cores + 8 slower ones; a core's two threads share vector units.", f: "Reported as measured and labeled a hypothesis." },
+  { p: "driver", t: "The build did nothing (paths)", s: "Kernel source seemed missing.", c: "HOME was mangled when launching WSL from Windows.", f: "Absolute paths in all scripts." },
+  { p: "driver", t: "The interrupt never arrived", s: "Right answer in the device, handler never ran.", c: "QEMU's edu device never delivers MSI, even when enabled.", f: "One-change experiments proved it; switched to INTx and removed 'MSI' from the docs." },
+  { p: "driver", t: "CI failed with exit code 126", s: "'Build kernel' failed instantly.", c: "Scripts were committed as not executable.", f: "Fixed file modes; added a fresh-clone test (ci_local.sh)." },
+  { p: "driver", t: "CI failed although all tests passed", s: "Health check flagged a CPU boot notice.", c: "It matched the bare word WARNING.", f: "Match real kernel warnings only; re-verified that KASAN still catches a planted overflow." }
+];
+
+/* ---------- helpers ---------- */
+const $ = (id) => document.getElementById(id);
+const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const fmt = (x) => (x >= 10 ? x.toFixed(1) : x.toFixed(2));
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* theme */
+(function () {
+  const saved = (() => { try { return localStorage.getItem("theme"); } catch (e) { return null; } })();
+  if (saved) document.documentElement.dataset.theme = saved;
+  $("theme").addEventListener("click", () => {
+    const dark = document.documentElement.dataset.theme
+      ? document.documentElement.dataset.theme === "dark"
+      : window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const next = dark ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem("theme", next); } catch (e) { /* storage blocked: fine */ }
+    drawAll();
+  });
+})();
+
+/* ---------- generic SVG bar chart ---------- */
+function barChart(svg, opts) {
+  const W = opts.w, H = opts.h, m = { l: 46, r: 12, t: 14, b: 38 };
+  const max = Math.max(...opts.bars.map((b) => b.v)) * 1.12;
+  const pw = W - m.l - m.r, ph = H - m.t - m.b;
+  const bw = pw / opts.bars.length;
+  let s = "";
+  const ticks = 4;
+  for (let i = 0; i <= ticks; i++) {
+    const v = (max * i) / ticks, y = m.t + ph - (ph * i) / ticks;
+    s += `<line x1="${m.l}" x2="${W - m.r}" y1="${y}" y2="${y}" stroke="${css("--line")}"/>` +
+         `<text class="muted" x="${m.l - 6}" y="${y + 4}" font-size="11" text-anchor="end">${v < 10 ? v.toFixed(1) : Math.round(v)}</text>`;
+  }
+  opts.bars.forEach((b, i) => {
+    const h = (b.v / max) * ph, x = m.l + i * bw + bw * 0.15, y = m.t + ph - h;
+    s += `<rect x="${x}" y="${y}" width="${bw * 0.7}" height="${h}" rx="4" fill="${b.color || css("--accent")}"/>` +
+         `<text x="${x + bw * 0.35}" y="${y - 4}" font-size="11" text-anchor="middle">${fmt(b.v)}</text>` +
+         `<text class="muted" x="${x + bw * 0.35}" y="${H - m.b + 15}" font-size="11" text-anchor="middle">${b.label}</text>`;
+  });
+  if (opts.refLine) {
+    const y = m.t + ph - (opts.refLine.v / max) * ph;
+    /* the label goes on the bottom legend line, not on the plot, so it never covers a bar */
+    s += `<line x1="${m.l}" x2="${W - m.r}" y1="${y}" y2="${y}" stroke="${css("--warn")}" stroke-dasharray="5 4"/>` +
+         `<line x1="${W - m.r - 168}" x2="${W - m.r - 150}" y1="${H - 8}" y2="${H - 8}" stroke="${css("--warn")}" stroke-width="2" stroke-dasharray="4 3"/>` +
+         `<text x="${W - m.r}" y="${H - 4}" font-size="11" text-anchor="end" style="fill:${css("--warn")}">${opts.refLine.label}</text>`;
+  }
+  s += `<text class="muted" x="${m.l}" y="${H - 4}" font-size="11">${opts.xlabel || ""}</text>`;
+  svg.innerHTML = s;
+}
+
+/* ---------- memory-walk illustration ---------- */
+const MEM = { N: 8, LINE: 4, TOTAL: 16 };
+function walkSeq(kind) {
+  const seq = [];
+  if (kind === "col") { for (let j = 0; j < 2; j++) for (let k = 0; k < MEM.N; k++) seq.push([k, j]); }
+  else { for (let k = 0; k < 2; k++) for (let j = 0; j < MEM.N; j++) seq.push([k, j]); }
+  return seq;
+}
+function makeWalker(kind, ids) {
+  const st = { kind, seq: walkSeq(kind), i: 0, cache: [], miss: 0, hits: 0, state: [] };
+  const grid = $(ids.grid);
+  grid.innerHTML = "";
+  for (let r = 0; r < MEM.N; r++) for (let c = 0; c < MEM.N; c++) {
+    const d = document.createElement("div");
+    d.className = "cell"; d.textContent = r * MEM.N + c;
+    grid.appendChild(d);
+  }
+  st.cells = grid.children;
+  st.ids = ids;
+  return st;
+}
+const lineOf = (r, c) => r * (MEM.N / MEM.LINE) + Math.floor(c / MEM.LINE);
+function walkStep(st, cap) {
+  if (st.i >= st.seq.length) return false;
+  const [r, c] = st.seq[st.i++], ln = lineOf(r, c);
+  const idx = st.cache.indexOf(ln);
+  let miss = false;
+  if (idx >= 0) { st.cache.splice(idx, 1); st.hits++; }
+  else { miss = true; st.miss++; if (st.cache.length >= cap) st.cache.shift(); }
+  st.cache.push(ln);
+  for (const el of st.cells) el.classList.remove("now", "miss", "cached");
+  st.state[r * MEM.N + c] = true;
+  for (let k = 0; k < st.cells.length; k++) {
+    const rr = Math.floor(k / MEM.N), cc = k % MEM.N;
+    st.cells[k].classList.toggle("seen", !!st.state[k]);
+    st.cells[k].classList.toggle("cached", st.cache.includes(lineOf(rr, cc)));
+  }
+  st.cells[r * MEM.N + c].classList.add(miss ? "miss" : "now");
+  $(st.ids.cache).innerHTML = st.cache.map((l) => `<span class="cline">line ${l}</span>`).join("");
+  const done = st.i;
+  $(st.ids.bar).style.width = (st.miss / MEM.TOTAL) * 100 + "%";
+  $(st.ids.stat).textContent = `${done} of ${MEM.TOTAL} reads: ${st.miss} misses, ${st.hits} hits`;
+  return true;
+}
+let wA, wB, mTimer = null;
+function memReset() {
+  clearInterval(mTimer); mTimer = null; $("mPlay").textContent = "Play";
+  wA = makeWalker("col", { grid: "memA", cache: "cacheA", bar: "barA", stat: "statA" });
+  wB = makeWalker("row", { grid: "memB", cache: "cacheB", bar: "barB", stat: "statB" });
+  $("barA").style.width = "0"; $("barB").style.width = "0";
+  $("cacheA").innerHTML = $("cacheB").innerHTML = "";
+  $("statA").textContent = $("statB").textContent = "Press Play or Step";
+  $("mHint").textContent = "";
+}
+function memStep() {
+  const cap = +$("mCache").value;
+  walkStep(wA, cap); walkStep(wB, cap);
+  if (wA.i >= wA.seq.length && wB.i >= wB.seq.length) {
+    clearInterval(mTimer); mTimer = null; $("mPlay").textContent = "Play";
+    $("mHint").textContent = `Naive: ${wA.miss}/${MEM.TOTAL} misses. Reordered: ${wB.miss}/${MEM.TOTAL} misses.`;
+  }
+}
+$("mPlay").addEventListener("click", () => {
+  if (mTimer) { clearInterval(mTimer); mTimer = null; $("mPlay").textContent = "Play"; return; }
+  if (wA.i >= wA.seq.length) memReset();
+  $("mPlay").textContent = "Pause";
+  mTimer = setInterval(memStep, reduceMotion ? 250 : 450);
+});
+$("mStep").addEventListener("click", memStep);
+$("mReset").addEventListener("click", memReset);
+$("mCache").addEventListener("change", memReset);
+
+/* ---------- tiling ---------- */
+let tileTimer = null, tilePos = 0;
+function tileUpdate() {
+  const b = +$("tSize").value, frac = b / 1024;
+  const box = $("tileBox"), per = Math.max(1, Math.round(1 / frac));
+  const shown = Math.min(per, 8);
+  const p = tilePos % (shown * shown), col = p % shown, row = Math.floor(p / shown);
+  box.style.width = frac * 100 + "%"; box.style.height = frac * 100 + "%";
+  box.style.left = (col * frac * 100) + "%"; box.style.top = (row * frac * 100) + "%";
+  const bytes = b * b * 4;
+  const human = bytes >= 1048576 ? (bytes / 1048576).toFixed(2) + " MB" : (bytes / 1024) + " KB";
+  $("tText").textContent = `The tile is ${b} x ${b} floats (${human} of B), shown at its true share of a 1024 x 1024 matrix. The whole of B is 4 MB.`;
+  /* log scale bar from 1 KB to 16 MB */
+  const lo = Math.log2(1024), hi = Math.log2(16 * 1048576);
+  const pos = (x) => ((Math.log2(x) - lo) / (hi - lo)) * 100;
+  $("sizeFill").style.width = pos(bytes) + "%";
+  $("sizeBar").querySelectorAll(".mark").forEach((n) => n.remove());
+  [["L1 ~48 KB", 48 * 1024], ["L2 ~1.25 MB", 1.25 * 1048576], ["all of B 4 MB", 4 * 1048576]].forEach(([t, v], i) => {
+    const m = document.createElement("div"); m.className = "mark"; m.style.left = pos(v) + "%";
+    m.style.top = (i % 2 ? "-34px" : "-20px"); m.textContent = t; $("sizeBar").appendChild(m);
+  });
+  drawTile();
+}
+function drawTile() {
+  const sel = +$("tSize").value;
+  barChart($("svgTile"), { w: 420, h: 210, xlabel: "tile edge (BLOCK), GFLOPS", bars: TILE.map(([b, g]) => ({ v: g, label: b, color: b === sel ? css("--c1") : css("--accent") })) });
+}
+$("tSize").addEventListener("change", () => { tilePos = 0; tileUpdate(); });
+tileTimer = reduceMotion ? null : setInterval(() => { tilePos++; tileUpdate(); }, 900);
+
+/* ---------- SIMD ---------- */
+let sTimer = null, sTick = 0;
+function lanesInit() {
+  for (const id of ["lanesS", "lanesV"]) {
+    $(id).innerHTML = "";
+    for (let i = 0; i < 8; i++) { const d = document.createElement("div"); d.className = "lane"; $(id).appendChild(d); }
+  }
+  sTick = 0; renderLanes();
+}
+function renderLanes() {
+  const S = $("lanesS").children, V = $("lanesV").children;
+  for (let i = 0; i < 8; i++) { S[i].classList.toggle("on", i < sTick); V[i].classList.toggle("on", sTick >= 1); }
+  $("sCountS").textContent = `${Math.min(sTick, 8)} of 8 floats done, ${Math.min(sTick, 8)} instructions used`;
+  $("sCountV").textContent = sTick >= 1 ? "8 of 8 floats done, 1 instruction used" : "0 of 8 floats done";
+  $("sHint").textContent = sTick >= 8 ? "Same work: 8 instructions vs 1 (on paper; real speedup was 6.7x)." : "";
+}
+$("sPlay").addEventListener("click", () => {
+  if (sTimer) { clearInterval(sTimer); sTimer = null; $("sPlay").textContent = "Play"; return; }
+  if (sTick >= 8) lanesInit();
+  $("sPlay").textContent = "Pause";
+  sTimer = setInterval(() => { sTick++; renderLanes(); if (sTick >= 8) { clearInterval(sTimer); sTimer = null; $("sPlay").textContent = "Play"; } }, reduceMotion ? 300 : 600);
+});
+$("sReset").addEventListener("click", () => { clearInterval(sTimer); sTimer = null; $("sPlay").textContent = "Play"; lanesInit(); });
+
+/* ---------- threads ---------- */
+function threadGrid() {
+  const T = +$("thN").value; $("thVal").textContent = T;
+  const grid = $("tGrid"); grid.innerHTML = "";
+  const colors = ["--c0", "--c1", "--c2", "--c3", "--c4"];
+  /* schedule(static) over 64 collapsed iterations: contiguous chunks, first (64 mod T) threads get one more */
+  const total = 64, base = Math.floor(total / T), extra = total % T;
+  let owner = [];
+  for (let t = 0; t < T; t++) { const cnt = base + (t < extra ? 1 : 0); for (let k = 0; k < cnt; k++) owner.push(t); }
+  owner.forEach((t) => {
+    const d = document.createElement("div"); d.className = "tt";
+    d.style.background = `color-mix(in srgb, ${css(colors[t % 5])} ${70 + (Math.floor(t / 5) * 10)}%, ${css("--surface")})`;
+    d.textContent = t + 1; grid.appendChild(d);
+  });
+  const mx = Math.ceil(total / T);
+  $("thText").textContent = `64 output tiles (n = 1024, 128 x 128 each). Each thread gets ${base} or ${mx} tiles, in one contiguous block. Numbers show the owning thread.`;
+}
+function drawThreads() {
+  const n = $("thSize").value, d = THREADS[n];
+  barChart($("svgThreads"), { w: 420, h: 250, xlabel: "threads (GFLOPS, median of 3)",
+    refLine: { v: d.simd1, label: `step 4, 1 SIMD thread: ${fmt(d.simd1)}` },
+    bars: d.t.map(([t, g]) => ({ v: g, label: t, color: css("--c1") })) });
+}
+$("thN").addEventListener("input", threadGrid);
+$("thSize").addEventListener("change", drawThreads);
+
+/* ---------- ladder ---------- */
+function drawLadder() {
+  const n = $("lsize").value, d = LADDER[n], log = $("scale").value === "log";
+  const svg = $("svgLadder"), W = 700, H = 300, m = { l: 150, r: 70, t: 10, b: 28 };
+  const vals = d.g.map((g, i) => ({ i, g })).filter((x) => x.g !== null);
+  const maxV = Math.max(...vals.map((x) => x.g));
+  const minV = 0.3;
+  const sx = (v) => log ? ((Math.log10(v) - Math.log10(minV)) / (Math.log10(maxV * 1.15) - Math.log10(minV))) * (W - m.l - m.r)
+                        : (v / (maxV * 1.1)) * (W - m.l - m.r);
+  const rowH = (H - m.t - m.b) / STEPS.length;
+  const colors = ["--c4", "--c2", "--c0", "--c3", "--c1"];
+  let s = "";
+  STEPS.forEach((st, i) => {
+    const y = m.t + i * rowH, g = d.g[i];
+    s += `<text x="${m.l - 10}" y="${y + rowH / 2 + 4}" font-size="13" text-anchor="end">${st.id}. ${st.name}</text>`;
+    if (g === null) { s += `<text class="muted" x="${m.l + 6}" y="${y + rowH / 2 + 4}" font-size="12">not run (too slow)</text>`; return; }
+    const w = Math.max(2, sx(g));
+    s += `<rect x="${m.l}" y="${y + rowH * 0.18}" width="${w}" height="${rowH * 0.64}" rx="5" fill="${css(colors[i])}"/>` +
+         `<text x="${m.l + w + 6}" y="${y + rowH / 2 + 4}" font-size="13" font-weight="600">${fmt(g)}</text>`;
+  });
+  s += `<text class="muted" x="${m.l}" y="${H - 6}" font-size="11">GFLOPS (${log ? "log" : "linear"} scale), n = ${n}</text>`;
+  svg.innerHTML = s;
+  let t = `<table style="width:100%;border-collapse:collapse;font-size:14px;margin-top:8px"><thead><tr><th align="left">Step</th><th align="right">GFLOPS</th><th align="right">vs previous</th><th align="right">noise</th></tr></thead><tbody>`;
+  STEPS.forEach((st, i) => {
+    const g = d.g[i]; if (g === null) return;
+    const prev = i > 0 ? d.g[i - 1] : null;
+    t += `<tr style="border-top:1px solid ${css("--line")}"><td>${st.id}. ${st.name}</td><td align="right">${fmt(g)}</td>` +
+         `<td align="right">${prev ? (g / prev).toFixed(1) + "x" : "-"}</td><td align="right">${d.noise[i]}%</td></tr>`;
+  });
+  $("ladderTable").innerHTML = t + "</tbody></table>";
+}
+$("scale").addEventListener("change", drawLadder);
+$("lsize").addEventListener("change", drawLadder);
+
+function drawNaive() {
+  const pts = NAIVE_BY_N, re = REORDER_BY_N, svg = $("svgNaive"), W = 420, H = 200, m = { l: 40, r: 14, t: 16, b: 34 };
+  const xs = pts.map((p) => p[0]), maxY = 4, pw = W - m.l - m.r, ph = H - m.t - m.b;
+  const X = (i) => m.l + (i / (xs.length - 1)) * pw, Y = (v) => m.t + ph - (v / maxY) * ph;
+  let s = "";
+  for (let g = 0; g <= 4; g++) s += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(g)}" y2="${Y(g)}" stroke="${css("--line")}"/><text class="muted" x="${m.l - 6}" y="${Y(g) + 4}" font-size="11" text-anchor="end">${g}</text>`;
+  const path = (arr) => arr.map((p, i) => `${i ? "L" : "M"}${X(i)},${Y(p[1])}`).join(" ");
+  s += `<path d="${path(re)}" fill="none" stroke="${css("--c1")}" stroke-width="3"/><path d="${path(pts)}" fill="none" stroke="${css("--c4")}" stroke-width="3"/>`;
+  pts.forEach((p, i) => { s += `<circle cx="${X(i)}" cy="${Y(p[1])}" r="4" fill="${css("--c4")}"/><circle cx="${X(i)}" cy="${Y(re[i][1])}" r="4" fill="${css("--c1")}"/>` +
+    `<text class="muted" x="${X(i)}" y="${H - 14}" font-size="11" text-anchor="middle">n = ${p[0]}</text>` +
+    `<text x="${X(i) + 8}" y="${Y(p[1]) + 14}" font-size="11">${fmt(p[1])}</text>`; });
+  s += `<text style="fill:${css("--c4")}" x="${W - m.r}" y="${m.t + 6}" font-size="12" text-anchor="end">naive</text><text style="fill:${css("--c1")}" x="${W - m.r}" y="${m.t + 22}" font-size="12" text-anchor="end">reordered</text>`;
+  svg.innerHTML = s;
+}
+
+/* ---------- challenges ---------- */
+function drawChallenges() {
+  const f = $("cFilter").value;
+  $("chalList").innerHTML = CHALLENGES.filter((c) => f === "all" || c.p === f).map((c) =>
+    `<article class="card chal ${c.p}"><h3>${c.t} <span class="tag">${c.p === "matmul" ? "matmul" : "PCI driver"}</span></h3>` +
+    `<dl><dt>Symptom</dt><dd>${c.s}</dd><dt>Cause</dt><dd>${c.c}</dd><dt>Fix</dt><dd>${c.f}</dd></dl></article>`).join("");
+}
+$("cFilter").addEventListener("change", drawChallenges);
+
+function drawAll() { drawLadder(); drawNaive(); drawTile(); drawThreads(); }
+
+memReset(); lanesInit(); tileUpdate(); threadGrid(); drawAll(); drawChallenges();
+</script>
+</body>
+</html>

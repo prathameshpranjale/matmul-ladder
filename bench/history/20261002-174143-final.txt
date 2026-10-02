@@ -1,0 +1,55 @@
+# final run 20261002-174143   machine: 12th Gen Intel(R) Core(TM) i5-1235U
+## all versions, n=256 512 1024
+version           n    seconds    GFLOPS    noise    max_err  check
+# threads for threaded versions: 12   pin cpu for others: 2   block: 256
+v1_naive        256     0.0123     2.719      11%   5.86e-07  ok
+v2_reorder      256     0.0099     3.406      36%   5.86e-07  ok
+v3_blocked      256     0.0077     4.338      19%   5.86e-07  ok
+v4_simd         256     0.0009    35.766      28%   6.61e-07  ok
+v5_threads      256     0.0017    19.621     412%   6.61e-07  ok
+v1_naive        512     0.1214     2.211      10%   8.03e-07  ok
+v2_reorder      512     0.0785     3.420      25%   8.03e-07  ok
+v3_blocked      512     0.0637     4.216      18%   8.03e-07  ok
+v4_simd         512     0.0096    27.923      44%   7.94e-07  ok
+v5_threads      512     0.0039    69.548      47%   7.94e-07  ok
+v1_naive       1024     3.5047     0.613      13%   1.54e-06  ok
+v2_reorder     1024     0.6075     3.535       9%   1.54e-06  ok
+v3_blocked     1024     0.4982     4.310       3%   1.54e-06  ok
+v4_simd        1024     0.0769    27.936       3%   1.40e-06  ok
+v5_threads     1024     0.0259    82.808      26%   1.40e-06  ok
+
+## n=2048, versions 2 to 5
+version           n    seconds    GFLOPS    noise    max_err  check
+# threads for threaded versions: 12   pin cpu for others: 2   block: 256
+v2_reorder     2048     5.4620     3.145       4%   1.81e-06  ok
+v3_blocked     2048     4.2105     4.080       7%   1.81e-06  ok
+v4_simd        2048     0.8052    21.337      10%   1.83e-06  ok
+v5_threads     2048     0.2129    80.690       7%   1.83e-06  ok
+
+## thread scaling, n=1024
+round 1 done
+round 2 done
+round 3 done
+
+n=1024, 3 rounds, GFLOPS
+  v4_simd (1 thread)     median 26.997  range 26.355 .. 27.672
+  v5_threads, 1 thr      median 23.897  range 23.615 .. 24.017
+  v5_threads, 2 thr      median 48.877  range 47.498 .. 49.883
+  v5_threads, 4 thr      median 47.609  range 45.772 .. 51.599
+  v5_threads, 6 thr      median 59.550  range 59.315 .. 63.472
+  v5_threads, 8 thr      median 70.759  range 69.749 .. 74.838
+  v5_threads, 12 thr     median 81.684  range 79.429 .. 89.483
+
+## thread scaling, n=2048
+round 1 done
+round 2 done
+round 3 done
+
+n=2048, 3 rounds, GFLOPS
+  v4_simd (1 thread)     median 26.571  range 20.952 .. 26.939
+  v5_threads, 1 thr      median 22.871  range 20.623 .. 23.070
+  v5_threads, 2 thr      median 39.914  range 37.355 .. 41.333
+  v5_threads, 4 thr      median 55.284  range 55.244 .. 61.860
+  v5_threads, 6 thr      median 69.730  range 63.548 .. 72.543
+  v5_threads, 8 thr      median 77.956  range 74.264 .. 86.355
+  v5_threads, 12 thr     median 90.319  range 89.864 .. 96.602

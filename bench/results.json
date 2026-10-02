@@ -1,0 +1,28 @@
+{
+  "meta": {
+    "cpu": "12th Gen Intel(R) Core(TM) i5-1235U",
+    "compiler": "gcc 13.3.0",
+    "cflags": "-O2 -fno-tree-vectorize -fopenmp -std=c11 -Wall -Wextra -DBLOCK=256 -DPBLOCK=128",
+    "block": 256,
+    "threads": 12,
+    "sizes": [256, 512, 1024],
+    "metric": "GFLOPS = 2*n^3/seconds, median of runs"
+  },
+  "results": [
+    {"version": "v1_naive", "n": 256, "runs": 15, "seconds": 0.012341, "spread": 0.114, "gflops": 2.7189, "max_err": 5.858e-07, "correct": true},
+    {"version": "v2_reorder", "n": 256, "runs": 15, "seconds": 0.009851, "spread": 0.364, "gflops": 3.4061, "max_err": 5.858e-07, "correct": true},
+    {"version": "v3_blocked", "n": 256, "runs": 15, "seconds": 0.007734, "spread": 0.195, "gflops": 4.3385, "max_err": 5.858e-07, "correct": true},
+    {"version": "v4_simd", "n": 256, "runs": 15, "seconds": 0.000938, "spread": 0.277, "gflops": 35.7659, "max_err": 6.608e-07, "correct": true},
+    {"version": "v5_threads", "n": 256, "runs": 15, "seconds": 0.001710, "spread": 4.121, "gflops": 19.6211, "max_err": 6.608e-07, "correct": true},
+    {"version": "v1_naive", "n": 512, "runs": 11, "seconds": 0.121386, "spread": 0.095, "gflops": 2.2114, "max_err": 8.032e-07, "correct": true},
+    {"version": "v2_reorder", "n": 512, "runs": 11, "seconds": 0.078492, "spread": 0.252, "gflops": 3.4199, "max_err": 8.032e-07, "correct": true},
+    {"version": "v3_blocked", "n": 512, "runs": 11, "seconds": 0.063666, "spread": 0.184, "gflops": 4.2163, "max_err": 8.032e-07, "correct": true},
+    {"version": "v4_simd", "n": 512, "runs": 11, "seconds": 0.009613, "spread": 0.437, "gflops": 27.9235, "max_err": 7.936e-07, "correct": true},
+    {"version": "v5_threads", "n": 512, "runs": 11, "seconds": 0.003860, "spread": 0.467, "gflops": 69.5477, "max_err": 7.936e-07, "correct": true},
+    {"version": "v1_naive", "n": 1024, "runs": 5, "seconds": 3.504690, "spread": 0.132, "gflops": 0.6127, "max_err": 1.535e-06, "correct": true},
+    {"version": "v2_reorder", "n": 1024, "runs": 5, "seconds": 0.607462, "spread": 0.086, "gflops": 3.5352, "max_err": 1.535e-06, "correct": true},
+    {"version": "v3_blocked", "n": 1024, "runs": 5, "seconds": 0.498206, "spread": 0.033, "gflops": 4.3104, "max_err": 1.535e-06, "correct": true},
+    {"version": "v4_simd", "n": 1024, "runs": 5, "seconds": 0.076871, "spread": 0.034, "gflops": 27.9361, "max_err": 1.399e-06, "correct": true},
+    {"version": "v5_threads", "n": 1024, "runs": 5, "seconds": 0.025933, "spread": 0.261, "gflops": 82.8076, "max_err": 1.399e-06, "correct": true}
+  ]
+}

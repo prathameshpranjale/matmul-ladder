@@ -1,0 +1,8 @@
+# build outputs
+*.o
+*.out
+build/
+bin/
+
+# generated benchmark data is committed on purpose only when it is a reported result
+bench/*.tmp
