@@ -16,7 +16,7 @@ Repo: https://github.com/prathameshpranjale/edu-pci-driver
 | M1 to M3 | probe, ID register, liveness check | `edu ID register = 0x010000ed (version 1.0)`, `liveness check passed` |
 | M4 interrupt, MSI attempt | MSI with KVM | Device computed 3628800 and showed irq pending, handler never ran (timeout) |
 | M4 interrupt, INTx test | Plain INTx | `10! = 3628800 via irq 10 (OK)` |
-| M4 interrupt, MSI without KVM | Same code, software emulation | Still no interrupt: the `edu` model does not deliver MSI (QEMU 8.2.2) |
+| M4 interrupt, MSI without KVM | Same code, software emulation | Still no interrupt. (We first blamed the device; QEMU's source shows `edu` implements MSI, so the cause is unknown and probably on our side.) |
 | M5 char device | `test_edu`: 0! to 12! via ioctl | PASS, 0 failures |
 | M6 concurrency | `test_stress`: 8 processes x 500 requests, 4 CPUs | PASS, 4000 of 4000 correct |
 | M6 mutation | Mutex removed in a copy | Stress test FAILED: 8 of 8 workers got wrong results (single-caller test still passed) |

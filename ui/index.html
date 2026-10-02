@@ -367,7 +367,7 @@ const CHALLENGES = [
   { p: "matmul", t: "Step 5 on 1 thread was slower than step 4", s: "19.8 vs 25.7 GFLOPS, same kernel.", c: "Hypothesis: smaller output tiles, shorter inner loops.", f: "Swept the thread-tile size; 128 chosen as the best balance." },
   { p: "matmul", t: "Threads did not scale evenly", s: "2 threads 48.9, 4 threads 47.6 GFLOPS.", c: "Hypothesis: 2 fast cores + 8 slower ones; a core's two threads share vector units.", f: "Reported as measured and labeled a hypothesis." },
   { p: "driver", t: "The build did nothing (paths)", s: "Kernel source seemed missing.", c: "HOME was mangled when launching WSL from Windows.", f: "Absolute paths in all scripts." },
-  { p: "driver", t: "The interrupt never arrived", s: "Right answer in the device, handler never ran.", c: "QEMU's edu device never delivers MSI, even when enabled.", f: "One-change experiments proved it; switched to INTx and removed 'MSI' from the docs." },
+  { p: "driver", t: "The interrupt never arrived", s: "Right answer in the device, handler never ran.", c: "Still unknown. We first blamed the device, but QEMU's source shows edu implements MSI.", f: "Switched to INTx (works); removed 'MSI' from the docs; corrected the wrong claim after reading the source." },
   { p: "driver", t: "CI failed with exit code 126", s: "'Build kernel' failed instantly.", c: "Scripts were committed as not executable.", f: "Fixed file modes; added a fresh-clone test (ci_local.sh)." },
   { p: "driver", t: "CI failed although all tests passed", s: "Health check flagged a CPU boot notice.", c: "It matched the bare word WARNING.", f: "Match real kernel warnings only; re-verified that KASAN still catches a planted overflow." }
 ];

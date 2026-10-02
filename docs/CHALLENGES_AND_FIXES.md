@@ -17,10 +17,10 @@ Format: **Symptom** -> **Cause** -> **How we found it** -> **Fix** -> **Lesson**
 
 ### A2. The interrupt never arrived (MSI)
 - **Symptom:** factorial request timed out. The device had the right answer (3628800) and an interrupt pending, but the handler never ran.
-- **Cause:** QEMU's `edu` device never delivers MSI (QEMU 8.2.2), even when the guest enables it.
+- **Cause:** unknown. We first concluded "QEMU's `edu` device never delivers MSI", but **that was wrong**: QEMU's source (`hw/misc/edu.c`, v8.2.2) implements MSI (`msi_init`, `msi_notify`). In our setup the MSI never reached the handler, with KVM on and off; the cause is probably in our driver or VM setup and is still open.
 - **How found:** printed device registers on timeout; then changed one thing at a time: INTx worked, MSI with KVM off still failed.
-- **Fix:** use legacy shared INTx; document the finding; remove "MSI" from the resume line.
-- **Lesson:** isolate "my bug" from "the device's limit" with one-change experiments. Do not claim features you could not verify.
+- **Fix:** use legacy shared INTx (works); remove "MSI" from the resume line; later corrected the wrong "device can't do MSI" claim after reading QEMU's source.
+- **Lesson:** one-change experiments show *that* something fails, not *why*. Read the device's source or datasheet before blaming it. Do not claim features (or limits) you could not verify.
 
 ### A3. Tests passed but proved little
 - **Risk:** a passing test only means something if it can fail.
